@@ -3,91 +3,86 @@ const fs = require('fs-extra');
 const settings = require("./settings.json");
 const io = require('./index.js').io;
 
-
-let bans;
+let bans = {};
 
 exports.init = function() {
-    fs.writeFile("./bans.json", "{}", { flag: 'wx' }, function(err) {
-        if (!err) console.log("Created empty bans list.");
-        try {
+    fs.ensureFile("./bans.json")
+        .then(() => {
+            console.log("Created empty bans list.");
             bans = require("./bans.json");
-        } catch(e) {
+        })
+        .catch((err) => {
             throw "Could not load bans.json. Check syntax and permissions.";
-        }
-    });
+        });
 };
 
 exports.saveBans = function() {
-	fs.writeFile(
-		"./bans.json",
-		JSON.stringify(bans),
-		{ flag: 'w' },
-		function(error) {
-			log.info.log('info', 'banSave', {
-				error: error
-			});
-		}
-	);
+    fs.writeJson("./bans.json", bans)
+        .then(() => {
+            log.info.log('info', 'banSave', { error: null });
+        })
+        .catch((error) => {
+            log.info.log('info', 'banSave', { error });
+        });
 };
 
 // Ban length is in minutes
 exports.addBan = function(ip, length, reason) {
-	length = parseFloat(length) || settings.banLength;
-	reason = reason || "N/A";
-	bans[ip] = {
-		reason: reason,
-		end: new Date().getTime() + (length * 60000)
-	};
+    length = parseFloat(length) || settings.banLength;
+    reason = reason || "N/A";
+    bans[ip] = {
+        reason,
+        end: new Date().getTime() + length * 60000,
+    };
 
-	var sockets = io.sockets.sockets;
-	var socketList = Object.keys(sockets);
+    const sockets = io.sockets.sockets;
+    const socketList = Object.keys(sockets);
 
-	for (var i = 0; i < socketList.length; i++) {
-		var socket = sockets[socketList[i]];
-		if (socket.request.connection.remoteAddress == ip)
-			exports.handleBan(socket);
-	}
-	exports.saveBans();
+    for (const socketId of socketList) {
+        const socket = sockets[socketId];
+        if (socket.request.connection.remoteAddress === ip) {
+            exports.handleBan(socket);
+        }
+    }
+
+    exports.saveBans();
 };
 
 exports.removeBan = function(ip) {
-	delete bans[ip];
-	exports.saveBans();
+    delete bans[ip];
+    exports.saveBans();
 };
 
 exports.handleBan = function(socket) {
-	var ip = socket.request.connection.remoteAddress;
-	if (bans[ip].end <= new Date().getTime()) {
-		exports.removeBan(ip);
-		return false;
-	}
+    const ip = socket.request.connection.remoteAddress;
 
-	log.access.log('info', 'ban', {
-		ip: ip
-	});
-	socket.emit('ban', {
-		reason: bans[ip].reason,
-		end: bans[ip].end
-	});
-	socket.disconnect();
-	return true;
+    if (bans[ip] && bans[ip].end <= new Date().getTime()) {
+        exports.removeBan(ip);
+        return false;
+    }
+
+    log.access.log('info', 'ban', { ip });
+    socket.emit('ban', {
+        reason: bans[ip].reason,
+        end: bans[ip].end,
+    });
+    socket.disconnect();
+    return true;
 };
 
 exports.kick = function(ip, reason) {
-	var sockets = io.sockets.sockets;
-	var socketList = Object.keys(sockets);
+    const sockets = io.sockets.sockets;
+    const socketList = Object.keys(sockets);
 
-	for (var i = 0; i < socketList.length; i++) {
-		var socket = sockets[socketList[i]];
-		if (socket.request.connection.remoteAddress == ip) {
-			socket.emit('kick', {
-				reason: reason || "N/A"
-			});
-			socket.disconnect();
-		}
-	}
+    for (const socketId of socketList) {
+        const socket = sockets[socketId];
+        if (socket.request.connection.remoteAddress === ip) {
+            socket.emit('kick', { reason: reason || "N/A" });
+            socket.disconnect();
+        }
+    }
 };
 
 exports.isBanned = function(ip) {
-    return Object.keys(bans).indexOf(ip) != -1;
+    return bans.hasOwnProperty(ip);
 };
