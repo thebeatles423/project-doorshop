@@ -1,6 +1,6 @@
 # Project Doorshop (UNSTABLE!)
 I'm going to warn you, this build is extremely unstable.
-
+Also, this is a very heavily edited version of BonziWORLD.
 ## Dependencies
 - Node.js and npm
 - Ruby
