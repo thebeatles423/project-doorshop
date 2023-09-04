@@ -1,4 +1,8 @@
 # Project Doorshop (UNSTABLE!)
+THIS CODE IS BROKEN. SETTINGS.JSON IS FUCKED.
+
+
+
 I'm going to warn you, this build is extremely unstable.
 Also, this is a very heavily edited version of BonziWORLD.
 ## Dependencies
